@@ -1,4 +1,5 @@
 from os import name
+import os
 
 from flask import Flask, jsonify, request
 from flask_jwt_extended import JWTManager, create_access_token, jwt_required
@@ -10,8 +11,18 @@ from flask import send_from_directory
 app = Flask(__name__)
 CORS(app) # Habilita CORS para permitir requisições do Angular
 
-# Aqui definimos o nome do arquivo. O 'instance/' garante que ele fique na pasta correta
-app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///streetmodel.db'
+# --- CONFIGURAÇÃO INTELIGENTE DA BASE DE DADOS ---
+# 1. Tenta ler a variável 'DATABASE_URL' fornecida pela nuvem. 
+# Se estiveres a correr no teu computador local e ela não existir, usa o SQLite como fallback.
+DATABASE_URL = os.environ.get("DATABASE_URL", "postgresql://neondb_owner:npg_hwFRLOci41Gt@ep-shy-hill-acj3f8qb-pooler.sa-east-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require")
+
+# 2. Correção Crítica do SQLAlchemy 1.4+:
+# Algumas plataformas de deploy antigos (como Heroku/Render) geram o link a começar por "postgres://",
+# mas as versões novas do SQLAlchemy exigem obrigatoriamente que comece por "postgresql://"
+if DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+
+app.config['SQLALCHEMY_DATABASE_URI'] = DATABASE_URL
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
@@ -171,7 +182,7 @@ def custom_static(filename):
 
 with app.app_context():
     db.create_all()
-    print("Banco de dados 'streetmodel.db' gerado com sucesso!")
+    print("Estrutura da base de dados verificada/gerada com sucesso!")
     
 if __name__ == "__main__":
     app.run(debug=True)
