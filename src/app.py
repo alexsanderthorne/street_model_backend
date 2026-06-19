@@ -104,12 +104,39 @@ def listar_produtos():
         } for p in produtos
     ]), 200
 
+# --- ROTA PARA EDITAR PRODUTO ---
 @app.route("/api/produtos/<int:id>", methods=["PUT"])
-@jwt_required()
+@jwt_required() # Segurança: Apenas administradores autenticados podem alterar dados
 def editar_produto(id):
-    dados_atualizados = request.get_json()
-    # Código SQL para UPDATE produtos SET ... WHERE id = id
-    return jsonify(mensagem="Produto atualizado!"), 200
+    # 1. Localiza o produto existente no SQLite
+    produto = Produto.query.get(id)
+    
+    if not produto:
+        return jsonify(mensagem="Erro: Produto não encontrado no catálogo!"), 404
+        
+    # 2. Captura os novos dados enviados pelo Angular
+    dados = request.get_json()
+    
+    if not dados or not dados.get('name') or not dados.get('price') or not dados.get('imageUrl'):
+        return jsonify(mensagem="Erro: Preencha todos os campos obrigatórios!"), 400
+        
+    try:
+        # 3. Atualiza os campos do objeto do banco de dados
+        produto.name = dados['name']
+        produto.price = float(dados['price'])
+        produto.imageUrl = dados['imageUrl']
+        produto.isNewRelease = dados.get('isNewRelease', False)
+        
+        # 4. PERSISTÊNCIA: Grava as modificações de forma definitiva no arquivo .db
+        db.session.commit()
+        
+        return jsonify({
+            "mensagem": f"Produto '{produto.name}' atualizado com sucesso!"
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"mensagem": f"Erro interno ao atualizar banco: {str(e)}"}), 500
 
 # --- ROTA PARA DELETAR PRODUTO ---
 @app.route("/api/produtos/<int:id>", methods=["DELETE"])
